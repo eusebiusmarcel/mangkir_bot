@@ -22,4 +22,4 @@ group :test do
   gem 'capybara'
 end
 
-gem 'dotenv-rails'
+gem 'dotenv'

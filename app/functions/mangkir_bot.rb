@@ -1,37 +1,46 @@
 require 'dotenv/load'
 require 'telegram/bot'
 require 'faraday'
+require 'byebug'
+require_relative 'notification_message_builder'
+require_relative 'data_storer'
 
 Telegram::Bot::Client.run(ENV['TELEGRAM_BOT_API_TOKEN']) do |bot|
-  airtable_app_url = "https://api.airtable.com/v0/#{ENV['AIRTABLE_APP_KEY']}"
-
   bot.listen do |message|
-    case message.text
+    command = message.text.split
+    case command.shift
     when '/save'
+      permission_type = command.shift
+      unless %w[annual sick remote].include?(permission_type)
+        bot.api.send_message(chat_id: message.chat.id, text: 'Invalid permission type')
+        next
+      end
+
+      dates = command.map do |date|
+        Date.strptime(date, '%d-%m-%y')
+      end
+
+      username    = message.from.username
       first_name  = message.from.first_name
       last_name   = message.from.last_name
       full_name   = first_name + ' ' + last_name
 
-      bot.api.send_message(chat_id: message.chat.id, text: "#{full_name} takes annual leave for 1 day")
+      notification_message = NotificationMessageBuilder.new(
+        full_name: full_name,
+        permission_type: permission_type,
+        dates: dates
+      ).call
 
-      data = {
-        'fields': {
-          'Username': 'test_from_ruby'
-        }
-      }.to_json
+      bot.api.send_message(
+        chat_id: message.chat.id,
+        text: notification_message
+      )
 
-      connection = Faraday.new(url: airtable_app_url + "/Leaves") do |faraday|
-        faraday.response :logger                  # log requests to STDOUT
-        faraday.adapter  Faraday.default_adapter  # make requests with Net::HTTP
-      end
-
-      connection.authorization(:Bearer, ENV['AIRTABLE_API_KEY'])
-
-      connection.post do |req|
-        req.headers['content-type'] = 'application/json'
-
-        req.body = data
-      end
+      DataStorer.new(
+        username: username,
+        permission_type: permission_type,
+        dates: dates
+      ).run
     end
   end
 end
