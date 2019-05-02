@@ -1,10 +1,10 @@
+require 'dotenv/load'
 require 'telegram/bot'
 require 'faraday'
 
-token = ENV['TELEGRAM_BOT_API_TOKEN']
-AIRTABLE_APP_URL = "https://api.airtable.com/v0/#{ENV['AIRTABLE_APP_KEY']}"
+Telegram::Bot::Client.run(ENV['TELEGRAM_BOT_API_TOKEN']) do |bot|
+  airtable_app_url = "https://api.airtable.com/v0/#{ENV['AIRTABLE_APP_KEY']}"
 
-Telegram::Bot::Client.run(token) do |bot|
   bot.listen do |message|
     case message.text
     when '/save'
@@ -20,12 +20,12 @@ Telegram::Bot::Client.run(token) do |bot|
         }
       }.to_json
 
-      connection = Faraday.new(url: AIRTABLE_APP_URL + "/Leaves") do |faraday|
+      connection = Faraday.new(url: airtable_app_url + "/Leaves") do |faraday|
         faraday.response :logger                  # log requests to STDOUT
         faraday.adapter  Faraday.default_adapter  # make requests with Net::HTTP
       end
 
-      @connection.authorization(:Bearer, ENV['AIRTABLE_API_KEY'])
+      connection.authorization(:Bearer, ENV['AIRTABLE_API_KEY'])
 
       connection.post do |req|
         req.headers['content-type'] = 'application/json'
